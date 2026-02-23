@@ -2,12 +2,18 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Plaud - Application de notes vocales avec gestion de dossiers et recherche avancée">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#4361ee">
+    <meta name="description" content="Plaud - Application de notes vocales avec gestion avancée des permissions microphone">
     <title>Plaud - Notes Vocales</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192x192.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* ===== RESET & VARIABLES ===== */
+        /* ===== STYLES DE BASE ===== */
         :root {
             --primary: #4361ee;
             --primary-dark: #3a56d4;
@@ -24,33 +30,50 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
             background-color: var(--bg-light);
             color: var(--text-light);
             min-height: 100vh;
+            touch-action: manipulation;
         }
 
-        /* ===== LAYOUT ===== */
+        /* ===== LAYOUT MOBILE-FIRST ===== */
         .app-container {
             display: flex;
+            flex-direction: column;
             min-height: 100vh;
         }
 
+        @media (min-width: 768px) {
+            .app-container {
+                flex-direction: row;
+            }
+        }
+
         .sidebar {
-            width: 250px;
+            width: 100%;
             background-color: var(--card-light);
-            border-right: 1px solid rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            padding: 15px;
+            order: 1;
+        }
+
+        @media (min-width: 768px) {
+            .sidebar {
+                width: 250px;
+                border-right: 1px solid rgba(0, 0, 0, 0.1);
+                border-bottom: none;
+                order: 0;
+            }
         }
 
         .main-content {
             flex: 1;
-            padding: 20px;
+            padding: 15px;
             display: flex;
             flex-direction: column;
         }
@@ -60,26 +83,22 @@
             font-size: 24px;
             font-weight: bold;
             color: var(--primary);
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             text-align: center;
         }
 
         .nav-item {
             display: flex;
             align-items: center;
-            padding: 10px;
-            border-radius: 5px;
-            cursor: pointer;
+            padding: 10px 15px;
             margin-bottom: 5px;
+            border-radius: 8px;
+            cursor: pointer;
             transition: all 0.2s;
         }
 
-        .nav-item:hover {
+        .nav-item:hover, .nav-item.active {
             background-color: rgba(67, 97, 238, 0.1);
-        }
-
-        .nav-item.active {
-            background-color: rgba(67, 97, 238, 0.2);
             color: var(--primary);
         }
 
@@ -89,261 +108,176 @@
             text-align: center;
         }
 
-        .header {
+        /* ===== ENREGISTREMENT ===== */
+        .recording-controls {
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
+            margin: 20px 0;
+            flex-direction: column;
             align-items: center;
-            margin-bottom: 20px;
         }
 
-        .search-container {
-            flex: 1;
-            max-width: 400px;
+        .record-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background-color: var(--danger);
+            color: white;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .record-btn.recording {
+            background-color: #dc3545;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .timer {
+            font-size: 24px;
+            margin: 15px 0;
+            font-family: monospace;
+        }
+
+        .visualizer {
+            width: 100%;
+            height: 100px;
+            background-color: rgba(67, 97, 238, 0.1);
+            border-radius: 8px;
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* ===== MESSAGES D'ERREUR ===== */
+        .error-message {
+            background-color: #dc3545;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            display: none;
             position: relative;
         }
 
-        .search-container input {
-            width: 100%;
-            padding: 10px 15px 10px 40px;
-            border: 1px solid #ddd;
-            border-radius: 20px;
-            font-size: 14px;
+        .error-message.show {
+            display: block;
         }
 
-        .search-container i {
+        .error-message .close-btn {
             position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #6c757d;
-        }
-
-        .btn {
-            padding: 8px 15px;
+            top: 5px;
+            right: 10px;
+            background: none;
             border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            transition: all 0.2s;
-        }
-
-        .btn-primary {
-            background-color: var(--primary);
             color: white;
+            font-size: 20px;
+            cursor: pointer;
         }
 
-        .btn-primary:hover {
-            background-color: var(--primary-dark);
+        /* ===== INSTRUCTIONS MOBILE ===== */
+        .mobile-instructions {
+            background-color: rgba(67, 97, 238, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid var(--primary);
         }
 
-        .btn-secondary {
-            background-color: var(--light);
-            color: var(--text-light);
-            border: 1px solid #ddd;
+        .mobile-instructions h3 {
+            color: var(--primary);
+            margin-bottom: 10px;
         }
 
-        .btn-secondary:hover {
-            background-color: #e9ecef;
+        .mobile-instructions ol {
+            padding-left: 20px;
         }
 
-        .content {
-            flex: 1;
-            background-color: var(--card-light);
-            border-radius: 10px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
+        .mobile-instructions li {
+            margin-bottom: 8px;
         }
 
-        .empty-state {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            color: #6c757d;
-        }
-
-        .empty-state i {
-            font-size: 48px;
-            margin-bottom: 20px;
-            color: #ced4da;
-        }
-
+        /* ===== LISTE DES ENREGISTREMENTS ===== */
         .recordings-list {
             flex: 1;
             overflow-y: auto;
         }
 
         .recording-item {
-            display: flex;
-            align-items: center;
+            background-color: var(--card-light);
+            border-radius: 8px;
             padding: 15px;
-            border-bottom: 1px solid #eee;
-            transition: all 0.2s;
-        }
-
-        .recording-item:hover {
-            background-color: rgba(67, 97, 238, 0.05);
-        }
-
-        .recording-icon {
-            width: 40px;
-            height: 40px;
-            background-color: rgba(67, 97, 238, 0.1);
-            border-radius: 5px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
             display: flex;
             align-items: center;
-            justify-content: center;
-            margin-right: 15px;
-            color: var(--primary);
         }
 
-        .recording-player audio {
-            width: 100%;
-            margin-top: 10px;
+        .recording-item .play-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: var(--primary);
+            cursor: pointer;
+            margin-right: 15px;
+        }
+
+        .recording-info {
+            flex: 1;
+        }
+
+        .recording-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .recording-meta {
+            font-size: 12px;
+            color: #666;
+            display: flex;
+            align-items: center;
+        }
+
+        .recording-meta i {
+            margin-right: 5px;
+        }
+
+        .recording-actions {
+            display: flex;
+            gap: 10px;
         }
 
         .recording-actions button {
             background: none;
             border: none;
-            color: #6c757d;
+            color: #666;
             cursor: pointer;
-            padding: 5px;
-            border-radius: 3px;
-            transition: all 0.2s;
-        }
-
-        .recording-actions button:hover {
-            background-color: rgba(0, 0, 0, 0.05);
-        }
-
-        .recording-actions .favorite {
-            color: #ffc107;
-        }
-
-        .recording-actions .favorite.active {
-            color: #ffc107;
-        }
-
-        .recording-actions .delete {
-            color: #dc3545;
-        }
-
-        /* ===== MODALES & CONTRÔLES ===== */
-        .recording-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s;
-        }
-
-        .recording-modal.active {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .modal-content {
-            background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            width: 100%;
-            max-width: 500px;
-            position: relative;
-        }
-
-        .modal-close {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: none;
-            border: none;
-            font-size: 20px;
-            cursor: pointer;
-            color: #6c757d;
-        }
-
-        .recording-controls {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: var(--primary);
-            color: white;
-            padding: 15px 30px;
-            border-radius: 50px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-            z-index: 100;
-            transition: all 0.3s;
-        }
-
-        .recording-controls.hidden {
-            opacity: 0;
-            visibility: hidden;
-            transform: translate(-50%, 100px);
-        }
-
-        .recording-timer {
             font-size: 16px;
-            min-width: 60px;
-            text-align: center;
-        }
-
-        .recording-visualizer-container {
-            width: 200px;
-            height: 30px;
-            position: relative;
-        }
-
-        .visualizer-bars {
-            display: flex;
-            height: 100%;
-            align-items: flex-end;
-            gap: 2px;
-        }
-
-        .visualizer-bar {
-            flex: 1;
-            background-color: white;
-            border-radius: 2px;
-            transition: height 0.1s;
         }
 
         /* ===== RESPONSIVE ===== */
-        @media (max-width: 768px) {
-            .sidebar {
+        @media (max-width: 767px) {
+            .recording-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .recording-actions {
+                margin-top: 10px;
                 width: 100%;
-                border-right: none;
-                border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-                padding: 15px;
-            }
-
-            .recording-controls {
-                left: 20px;
-                transform: none;
-                width: calc(100% - 40px);
                 justify-content: space-between;
-                padding: 10px 20px;
-            }
-
-            .recording-visualizer-container {
-                display: none;
             }
         }
     </style>
@@ -352,533 +286,468 @@
     <div class="app-container">
         <div class="sidebar">
             <div class="logo">Plaud</div>
-            <div class="nav-section">
-                <div class="nav-item active" data-section="recordings">
-                    <i class="fas fa-microphone"></i>
-                    <span>Enregistrements</span>
-                </div>
-                <div class="nav-item" data-section="folders">
-                    <i class="fas fa-folder"></i>
-                    <span>Dossiers</span>
-                </div>
-                <div class="nav-item" data-section="favorites">
-                    <i class="fas fa-star"></i>
-                    <span>Favoris</span>
-                </div>
+            <div class="nav-item active" onclick="setSection('all')">
+                <i class="fas fa-folder"></i>
+                <span>Tous les enregistrements</span>
             </div>
-            <div class="nav-section">
-                <h3>Outils</h3>
-                <div class="nav-item" data-section="settings">
-                    <i class="fas fa-cog"></i>
-                    <span>Paramètres</span>
-                </div>
-                <div class="nav-item" data-section="help">
-                    <i class="fas fa-question-circle"></i>
-                    <span>Aide</span>
-                </div>
+            <div class="nav-item" onclick="setSection('favorites')">
+                <i class="fas fa-star"></i>
+                <span>Favoris</span>
+            </div>
+            <div class="nav-item" onclick="setSection('recent')">
+                <i class="fas fa-clock"></i>
+                <span>Récents</span>
+            </div>
+            <div class="nav-item" onclick="showAddFolderModal()">
+                <i class="fas fa-folder-plus"></i>
+                <span>Nouveau dossier</span>
             </div>
         </div>
 
         <div class="main-content">
-            <div class="header">
-                <div class="search-container">
-                    <i class="fas fa-search"></i>
-                    <input type="text" placeholder="Rechercher..." id="searchInput">
+            <div class="recording-controls">
+                <div class="error-message" id="microphoneError">
+                    <button class="close-btn" onclick="this.parentElement.classList.remove('show')">&times;</button>
+                    <h3>⚠️ Problème de microphone</h3>
+                    <p id="errorDetails">Impossible d'accéder au microphone. Veuillez suivre les instructions ci-dessous.</p>
                 </div>
-                <div class="header-actions">
-                    <button class="btn btn-secondary" id="newFolderBtn">
-                        <i class="fas fa-folder-plus"></i>
-                        Nouveau dossier
-                    </button>
-                    <button class="btn btn-primary" id="recordBtn">
-                        <i class="fas fa-microphone"></i>
-                        Nouveau
-                    </button>
+
+                <div class="mobile-instructions" id="mobileInstructions">
+                    <h3>📱 Instructions pour mobile</h3>
+                    <p>Pour utiliser le microphone sur votre téléphone :</p>
+                    <ol>
+                        <li>Appuyez sur <strong>"Autoriser"</strong> quand le navigateur le demande</li>
+                        <li>Si bloqué :
+                            <ul>
+                                <li><strong>Android</strong> : Paramètres → Apps → Chrome → Autorisations → Microphone</li>
+                                <li><strong>iOS</strong> : Réglages → Safari → Microphone</li>
+                            </ul>
+                        </li>
+                        <li>Redémarrez l'application après avoir modifié les paramètres</li>
+                    </ol>
+                    <button onclick="document.getElementById('mobileInstructions').style.display='none'">J'ai compris</button>
                 </div>
+
+                <button class="record-btn" id="recordBtn" onclick="toggleRecording()">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <div class="timer" id="timer">00:00</div>
+                <div class="visualizer" id="visualizer"></div>
             </div>
 
-            <div class="content">
-                <div class="empty-state" id="emptyState">
-                    <i class="fas fa-microphone-slash"></i>
-                    <h3>Aucun enregistrement</h3>
-                    <p>Cliquez sur "Nouveau" pour commencer</p>
-                </div>
-
-                <div class="recordings-list" id="recordingsList"></div>
-
-                <div class="recording-footer">
-                    <div class="recording-stats">
-                        <span id="recordingsCount">0 enregistrements</span>
-                    </div>
-                    <div class="recording-sort">
-                        <select id="sortSelect">
-                            <option value="date-desc">Date (récent d'abord)</option>
-                            <option value="date-asc">Date (ancien d'abord)</option>
-                            <option value="name-asc">Nom (A-Z)</option>
-                            <option value="name-desc">Nom (Z-A)</option>
-                            <option value="duration-asc">Durée (court d'abord)</option>
-                            <option value="duration-desc">Durée (long d'abord)</option>
-                        </select>
-                    </div>
-                </div>
+            <div class="recordings-list" id="recordingsList">
+                <!-- Les enregistrements seront affichés ici -->
             </div>
         </div>
     </div>
 
-    <!-- Modale d'enregistrement -->
-    <div class="recording-modal" id="recordingModal">
+    <!-- Modal pour ajouter un dossier -->
+    <div class="modal" id="addFolderModal" style="display: none;">
         <div class="modal-content">
-            <button class="modal-close" id="modalClose">&times;</button>
-            <div class="modal-header">
-                <h2>Enregistrer l'audio</h2>
-            </div>
-            <div class="modal-body">
-                <div class="modal-form-group">
-                    <label for="recordingName">Nom</label>
-                    <input type="text" id="recordingName" placeholder="Ex: Réunion du 15 mai" required>
-                </div>
-                <div class="modal-form-group">
-                    <label for="recordingFolder">Dossier</label>
-                    <select id="recordingFolder"></select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="cancelSave">Annuler</button>
-                <button class="btn btn-primary" id="saveRecording">Enregistrer</button>
-            </div>
+            <span class="close" onclick="document.getElementById('addFolderModal').style.display='none'">&times;</span>
+            <h3>Nouveau dossier</h3>
+            <input type="text" id="folderName" placeholder="Nom du dossier">
+            <button onclick="addFolder()">Créer</button>
         </div>
-    </div>
-
-    <!-- Contrôles d'enregistrement -->
-    <div class="recording-controls hidden" id="recordingControls">
-        <div class="recording-timer" id="recordingTimer">00:00</div>
-        <div class="recording-visualizer-container">
-            <div class="recording-visualizer">
-                <div class="visualizer-bars" id="visualizerBars"></div>
-            </div>
-        </div>
-        <button id="stopRecording">
-            <i class="fas fa-stop"></i>
-        </button>
     </div>
 
     <script>
-        // ===== DONNÉES DE L'APPLICATION =====
-        const appData = {
-            recordings: JSON.parse(localStorage.getItem('plaudRecordings')) || [],
-            currentRecording: null,
-            mediaRecorder: null,
-            audioChunks: [],
-            audioContext: null,
-            analyser: null,
-            dataArray: null,
-            animationId: null,
-            isRecording: false,
-            startTime: null,
-            timerInterval: null,
-            folders: JSON.parse(localStorage.getItem('plaudFolders')) || [
-                { id: 'default', name: 'Aucun dossier' }
-            ]
+        // ===== VARIABLES GLOBALES =====
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioContext;
+        let analyser;
+        let dataArray;
+        let animationId;
+        let startTime;
+        let timerInterval;
+        let appData = {
+            recordings: [],
+            folders: ['Tous', 'Favoris', 'Récents'],
+            currentSection: 'all'
         };
 
-        // ===== ÉLÉMENTS DU DOM =====
-        const elements = {
-            recordingsList: document.getElementById('recordingsList'),
-            emptyState: document.getElementById('emptyState'),
-            recordingsCount: document.getElementById('recordingsCount'),
-            recordBtn: document.getElementById('recordBtn'),
-            recordingControls: document.getElementById('recordingControls'),
-            recordingTimer: document.getElementById('recordingTimer'),
-            stopRecording: document.getElementById('stopRecording'),
-            recordingModal: document.getElementById('recordingModal'),
-            recordingName: document.getElementById('recordingName'),
-            recordingFolder: document.getElementById('recordingFolder'),
-            saveRecording: document.getElementById('saveRecording'),
-            cancelSave: document.getElementById('cancelSave'),
-            modalClose: document.getElementById('modalClose'),
-            visualizerBars: document.getElementById('visualizerBars'),
-            searchInput: document.getElementById('searchInput'),
-            sortSelect: document.getElementById('sortSelect'),
-            newFolderBtn: document.getElementById('newFolderBtn')
-        };
-
-        // ===== INITIALISATION =====
-        document.addEventListener('DOMContentLoaded', () => {
-            renderRecordings();
-            setupEventListeners();
-            initializeVisualizer();
-            updateFoldersDropdown();
-            checkMicrophonePermission();
-        });
-
-        // ===== GESTION DES ÉVÉNEMENTS =====
-        function setupEventListeners() {
-            // Navigation
-            document.querySelectorAll('.nav-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-                    item.classList.add('active');
-                });
-            });
-
-            // Enregistrement
-            elements.recordBtn.addEventListener('click', startRecording);
-            elements.stopRecording.addEventListener('click', stopRecording);
-
-            // Modale
-            elements.saveRecording.addEventListener('click', saveRecording);
-            elements.cancelSave.addEventListener('click', hideRecordingModal);
-            elements.modalClose.addEventListener('click', hideRecordingModal);
-
-            // Recherche et tri
-            elements.searchInput.addEventListener('input', filterRecordings);
-            elements.sortSelect.addEventListener('change', renderRecordings);
-
-            // Dossiers
-            elements.newFolderBtn.addEventListener('click', createNewFolder);
-        }
-
-        // ===== FONCTIONS PRINCIPALES =====
-        /**
-         * Vérifie les permissions du microphone
-         */
+        // ===== GESTION DES PERMISSIONS MICROPHONE =====
         async function checkMicrophonePermission() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                // Vérification basique
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("L'API MediaDevices n'est pas supportée par votre navigateur");
+                }
+
+                // Configuration optimisée pour mobile
+                const constraints = {
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        sampleRate: 44100,
+                        channelCount: 1,
+                        deviceId: { exact: await getDefaultMicrophoneId() }
+                    },
+                    video: false
+                };
+
+                // Demande d'autorisation
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+                // Initialisation du visualiseur audio
+                initAudioVisualizer(stream);
+
+                // Nettoyage
                 stream.getTracks().forEach(track => track.stop());
+
+                return true;
             } catch (error) {
-                console.warn("Microphone non autorisé:", error);
-                alert("Veuillez autoriser l'accès au microphone dans les paramètres du navigateur.");
+                handleMicrophoneError(error);
+                return false;
             }
         }
 
-        /**
-         * Démarre un enregistrement audio
-         */
-        async function startRecording() {
+        async function getDefaultMicrophoneId() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const audioDevices = devices.filter(device => device.kind === 'audioinput');
+                return audioDevices.length > 0 ? audioDevices[0].deviceId : undefined;
+            } catch (error) {
+                console.warn("Impossible d'énumérer les devices:", error);
+                return undefined;
+            }
+        }
 
-                appData.audioChunks = [];
-                appData.isRecording = true;
-                appData.startTime = new Date();
+        function handleMicrophoneError(error) {
+            const errorMessage = document.getElementById('microphoneError');
+            const errorDetails = document.getElementById('errorDetails');
+            let message = "Erreur inconnue";
 
-                // Configuration du visualiseur audio
-                appData.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                appData.analyser = appData.audioContext.createAnalyser();
-                const source = appData.audioContext.createMediaStreamSource(stream);
-                source.connect(appData.analyser);
-                appData.analyser.fftSize = 64;
-                appData.dataArray = new Uint8Array(appData.analyser.frequencyBinCount);
+            // Détection du type d'erreur
+            if (error.name === "NotAllowedError") {
+                message = "L'accès au microphone a été bloqué. Veuillez :\n\n";
+                message += "1. Autoriser le microphone dans les paramètres du navigateur\n";
+                message += "2. Vérifier les paramètres de confidentialité de votre téléphone\n";
+                message += "3. Redémarrer l'application après modification";
 
-                // Configuration du MediaRecorder
-                appData.mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/wav' });
-                appData.mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        appData.audioChunks.push(event.data);
-                    }
-                };
+                // Afficher les instructions mobile si c'est un appareil mobile
+                if (isMobileDevice()) {
+                    document.getElementById('mobileInstructions').style.display = 'block';
+                }
+            } else if (error.name === "NotFoundError") {
+                message = "Aucun microphone détecté sur cet appareil. Veuillez vérifier :\n\n";
+                message += "1. Que votre microphone est branché (si externe)\n";
+                message += "2. Que votre appareil dispose d'un microphone intégré\n";
+                message += "3. Que le microphone n'est pas désactivé dans les paramètres système";
+            } else if (error.name === "NotReadableError") {
+                message = "Le microphone est déjà utilisé par une autre application. Veuillez :\n\n";
+                message += "1. Fermer les autres applications utilisant le microphone\n";
+                message += "2. Redémarrer votre appareil si le problème persiste";
+            } else if (error.name === "OverconstrainedError") {
+                message = "Les contraintes du microphone ne peuvent pas être satisfaites. Essayez avec un autre appareil.";
+            } else if (error.name === "AbortError") {
+                message = "La demande d'accès au microphone a été annulée.";
+            } else {
+                message = `Erreur technique: ${error.message}`;
+            }
 
-                appData.mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(appData.audioChunks, { type: 'audio/wav' });
-                    appData.currentRecording = {
-                        id: Date.now().toString(),
-                        name: '',
-                        blob: audioBlob,
-                        url: URL.createObjectURL(audioBlob),
-                        duration: getRecordingDuration(),
-                        date: new Date().toISOString(),
-                        folderId: 'default',
-                        isFavorite: false
+            errorDetails.textContent = message;
+            errorMessage.classList.add('show');
+
+            console.error("Erreur microphone:", error);
+        }
+
+        function isMobileDevice() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+
+        // ===== VISUALISATEUR AUDIO =====
+        function initAudioVisualizer(stream) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            const source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
+
+            analyser.fftSize = 256;
+            const bufferLength = analyser.frequencyBinCount;
+            dataArray = new Uint8Array(bufferLength);
+
+            const visualizer = document.getElementById('visualizer');
+            visualizer.innerHTML = '';
+
+            const canvas = document.createElement('canvas');
+            canvas.width = visualizer.clientWidth;
+            canvas.height = visualizer.clientHeight;
+            visualizer.appendChild(canvas);
+
+            const ctx = canvas.getContext('2d');
+
+            function draw() {
+                animationId = requestAnimationFrame(draw);
+                analyser.getByteFrequencyData(dataArray);
+
+                ctx.fillStyle = 'rgba(67, 97, 238, 0.1)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                const barWidth = (canvas.width / bufferLength) * 2.5;
+                let x = 0;
+
+                for (let i = 0; i < bufferLength; i++) {
+                    const barHeight = dataArray[i] / 2;
+                    ctx.fillStyle = `rgba(67, 97, 238, ${barHeight / 100})`;
+                    ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                    x += barWidth + 1;
+                }
+            }
+
+            draw();
+        }
+
+        // ===== ENREGISTREMENT AUDIO =====
+        async function toggleRecording() {
+            const recordBtn = document.getElementById('recordBtn');
+
+            if (!recordBtn.classList.contains('recording')) {
+                // Vérification des permissions avant enregistrement
+                const hasPermission = await checkMicrophonePermission();
+                if (!hasPermission) return;
+
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            sampleRate: 44100
+                        }
+                    });
+
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
                     };
 
-                    showRecordingModal();
-                    stream.getTracks().forEach(track => track.stop());
-                };
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        saveRecording(audioBlob);
+                        stream.getTracks().forEach(track => track.stop());
+                    };
 
-                appData.mediaRecorder.start();
-                elements.recordBtn.disabled = true;
-                elements.recordingControls.classList.remove('hidden');
-                startTimer();
-                drawVisualizer();
+                    mediaRecorder.start();
+                    recordBtn.classList.add('recording');
+                    startTimer();
 
-            } catch (error) {
-                console.error("Erreur microphone:", error);
-                alert("Impossible d'accéder au microphone. Veuillez vérifier les permissions.");
+                    // Initialisation du visualiseur
+                    initAudioVisualizer(stream);
+                } catch (error) {
+                    handleMicrophoneError(error);
+                }
+            } else {
+                mediaRecorder.stop();
+                recordBtn.classList.remove('recording');
+                clearInterval(timerInterval);
+                cancelAnimationFrame(animationId);
             }
         }
 
-        /**
-         * Arrête l'enregistrement en cours
-         */
-        function stopRecording() {
-            if (appData.mediaRecorder && appData.isRecording) {
-                appData.mediaRecorder.stop();
-                appData.isRecording = false;
-                elements.recordBtn.disabled = false;
-                elements.recordingControls.classList.add('hidden');
-                clearInterval(appData.timerInterval);
-                cancelAnimationFrame(appData.animationId);
-            }
-        }
-
-        /**
-         * Affiche la modale d'enregistrement
-         */
-        function showRecordingModal() {
-            elements.recordingName.value = `Enregistrement ${new Date().toLocaleString()}`;
-            elements.recordingModal.classList.add('active');
-            elements.recordingName.focus();
-        }
-
-        /**
-         * Masque la modale d'enregistrement
-         */
-        function hideRecordingModal() {
-            elements.recordingModal.classList.remove('active');
-            if (appData.currentRecording) {
-                URL.revokeObjectURL(appData.currentRecording.url);
-                appData.currentRecording = null;
-            }
-        }
-
-        /**
-         * Sauvegarde l'enregistrement dans localStorage
-         */
-        function saveRecording() {
-            const name = elements.recordingName.value.trim();
-            const folderId = elements.recordingFolder.value;
-
-            if (!name) {
-                alert("Veuillez donner un nom à l'enregistrement");
-                return;
-            }
-
-            appData.currentRecording.name = name;
-            appData.currentRecording.folderId = folderId;
-            appData.recordings.push(appData.currentRecording);
-            saveToLocalStorage();
-            renderRecordings();
-            hideRecordingModal();
-        }
-
-        /**
-         * Démarre le minuteur d'enregistrement
-         */
         function startTimer() {
-            appData.timerInterval = setInterval(() => {
-                elements.recordingTimer.textContent = formatTime(getRecordingDuration());
+            startTime = Date.now();
+            const timerElement = document.getElementById('timer');
+            timerElement.textContent = '00:00';
+
+            timerInterval = setInterval(() => {
+                const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                const minutes = Math.floor(elapsedTime / 60).toString().padStart(2, '0');
+                const seconds = (elapsedTime % 60).toString().padStart(2, '0');
+                timerElement.textContent = `${minutes}:${seconds}`;
             }, 1000);
         }
 
-        /**
-         * Calcule la durée de l'enregistrement
-         */
-        function getRecordingDuration() {
-            return Math.floor((new Date() - appData.startTime) / 1000);
+        function saveRecording(blob) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const audioData = reader.result;
+                const recording = {
+                    id: Date.now(),
+                    name: `Enregistrement ${appData.recordings.length + 1}`,
+                    date: new Date().toISOString(),
+                    duration: document.getElementById('timer').textContent,
+                    audio: audioData,
+                    isFavorite: false,
+                    folder: 'Tous'
+                };
+
+                appData.recordings.unshift(recording);
+                saveAppData();
+                renderRecordings();
+            };
+            reader.readAsDataURL(blob);
         }
 
-        /**
-         * Formate le temps en MM:SS
-         */
-        function formatTime(seconds) {
-            const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
-            const secs = (seconds % 60).toString().padStart(2, '0');
-            return `${mins}:${secs}`;
-        }
-
-        /**
-         * Dessine le visualiseur audio
-         */
-        function drawVisualizer() {
-            if (!appData.analyser) return;
-
-            appData.analyser.getByteFrequencyData(appData.dataArray);
-            const bars = elements.visualizerBars.querySelectorAll('.visualizer-bar');
-            const barCount = bars.length;
-            const step = Math.floor(appData.dataArray.length / barCount);
-
-            bars.forEach((bar, i) => {
-                const value = appData.dataArray[i * step];
-                bar.style.height = `${value / 2.5}%`;
-            });
-
-            appData.animationId = requestAnimationFrame(drawVisualizer);
-        }
-
-        /**
-         * Initialise le visualiseur audio
-         */
-        function initializeVisualizer() {
-            for (let i = 0; i < 20; i++) {
-                const bar = document.createElement('div');
-                bar.className = 'visualizer-bar';
-                elements.visualizerBars.appendChild(bar);
-            }
-        }
-
-        /**
-         * Rend la liste des enregistrements
-         */
+        // ===== GESTION DES ENREGISTREMENTS =====
         function renderRecordings() {
-            if (appData.recordings.length === 0) {
-                elements.emptyState.style.display = 'flex';
-                elements.recordingsList.innerHTML = '';
-                elements.recordingsCount.textContent = '0 enregistrements';
+            const recordingsList = document.getElementById('recordingsList');
+            recordingsList.innerHTML = '';
+
+            if (!Array.isArray(appData.recordings)) {
+                appData.recordings = [];
                 return;
             }
 
-            elements.emptyState.style.display = 'none';
-            elements.recordingsList.innerHTML = '';
+            let filteredRecordings = appData.recordings;
 
-            // Filtrer et trier
-            let filteredRecordings = filterRecordings();
-            filteredRecordings = sortRecordings(filteredRecordings);
+            if (appData.currentSection !== 'all') {
+                if (appData.currentSection === 'favorites') {
+                    filteredRecordings = appData.recordings.filter(r => r.isFavorite);
+                } else if (appData.currentSection === 'recent') {
+                    filteredRecordings = appData.recordings.slice(0, 5);
+                } else {
+                    filteredRecordings = appData.recordings.filter(r => r.folder === appData.currentSection);
+                }
+            }
+
+            if (filteredRecordings.length === 0) {
+                recordingsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">Aucun enregistrement trouvé</div>';
+                return;
+            }
 
             filteredRecordings.forEach(recording => {
                 const recordingElement = document.createElement('div');
                 recordingElement.className = 'recording-item';
-                recordingElement.dataset.id = recording.id;
-
-                const folder = appData.folders.find(f => f.id === recording.folderId) || appData.folders[0];
-                const duration = formatTime(recording.duration);
-
                 recordingElement.innerHTML = `
-                    <div class="recording-icon">
-                        <i class="fas fa-microphone"></i>
-                    </div>
+                    <button class="play-btn" onclick="playRecording('${recording.audio}')">
+                        <i class="fas fa-play"></i>
+                    </button>
                     <div class="recording-info">
                         <div class="recording-name">${recording.name}</div>
                         <div class="recording-meta">
-                            ${new Date(recording.date).toLocaleString()} • ${duration} • ${folder.name}
+                            <i class="fas fa-clock"></i> ${recording.duration} •
+                            <i class="fas fa-calendar-alt"></i> ${new Date(recording.date).toLocaleString()}
                         </div>
-                        <audio controls src="${recording.url}"></audio>
                     </div>
                     <div class="recording-actions">
-                        <button class="favorite ${recording.isFavorite ? 'active' : ''}" title="Favoris">
-                            <i class="fas fa-star"></i>
+                        <button onclick="toggleFavorite(${recording.id})">
+                            <i class="fas ${recording.isFavorite ? 'fa-star' : 'fa-star'}"></i>
                         </button>
-                        <button class="delete" title="Supprimer">
+                        <button onclick="renameRecording(${recording.id})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deleteRecording(${recording.id})">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
                 `;
-
-                elements.recordingsList.appendChild(recordingElement);
-
-                // Événements
-                recordingElement.querySelector('.favorite').addEventListener('click', () => {
-                    toggleFavorite(recording.id);
-                });
-
-                recordingElement.querySelector('.delete').addEventListener('click', () => {
-                    deleteRecording(recording.id);
-                });
-            });
-
-            elements.recordingsCount.textContent = `${filteredRecordings.length} enregistrement${filteredRecordings.length !== 1 ? 's' : ''}`;
-        }
-
-        /**
-         * Filtre les enregistrements par recherche
-         */
-        function filterRecordings() {
-            const searchTerm = elements.searchInput.value.toLowerCase();
-            return appData.recordings.filter(recording =>
-                recording.name.toLowerCase().includes(searchTerm) ||
-                new Date(recording.date).toLocaleString().toLowerCase().includes(searchTerm)
-            );
-        }
-
-        /**
-         * Trie les enregistrements
-         */
-        function sortRecordings(recordings = null) {
-            const sortValue = elements.sortSelect.value;
-            const list = recordings || appData.recordings;
-
-            return [...list].sort((a, b) => {
-                switch (sortValue) {
-                    case 'date-desc': return new Date(b.date) - new Date(a.date);
-                    case 'date-asc': return new Date(a.date) - new Date(b.date);
-                    case 'name-asc': return a.name.localeCompare(b.name);
-                    case 'name-desc': return b.name.localeCompare(a.name);
-                    case 'duration-asc': return a.duration - b.duration;
-                    case 'duration-desc': return b.duration - a.duration;
-                    default: return 0;
-                }
+                recordingsList.appendChild(recordingElement);
             });
         }
 
-        /**
-         * Bascule l'état favori d'un enregistrement
-         */
+        function playRecording(audioData) {
+            const audio = new Audio(audioData);
+            audio.play();
+        }
+
         function toggleFavorite(id) {
             const recording = appData.recordings.find(r => r.id === id);
             if (recording) {
                 recording.isFavorite = !recording.isFavorite;
-                saveToLocalStorage();
+                saveAppData();
                 renderRecordings();
             }
         }
 
-        /**
-         * Supprime un enregistrement
-         */
-        function deleteRecording(id) {
-            if (confirm("Supprimer cet enregistrement ?")) {
+        function renameRecording(id) {
+            const newName = prompt("Nouveau nom :");
+            if (newName) {
                 const recording = appData.recordings.find(r => r.id === id);
                 if (recording) {
-                    URL.revokeObjectURL(recording.url);
+                    recording.name = newName;
+                    saveAppData();
+                    renderRecordings();
                 }
+            }
+        }
+
+        function deleteRecording(id) {
+            if (confirm("Supprimer cet enregistrement ?")) {
                 appData.recordings = appData.recordings.filter(r => r.id !== id);
-                saveToLocalStorage();
+                saveAppData();
                 renderRecordings();
             }
         }
 
-        /**
-         * Crée un nouveau dossier
-         */
-        function createNewFolder() {
-            const folderName = prompt("Nom du dossier:");
-            if (folderName && folderName.trim()) {
-                const newFolder = {
-                    id: Date.now().toString(),
-                    name: folderName.trim()
-                };
-                appData.folders.push(newFolder);
-                saveFoldersToLocalStorage();
-                updateFoldersDropdown();
+        // ===== GESTION DES DOSSIERS =====
+        function setSection(section) {
+            appData.currentSection = section;
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.closest('.nav-item').classList.add('active');
+            renderRecordings();
+        }
+
+        function showAddFolderModal() {
+            document.getElementById('addFolderModal').style.display = 'block';
+        }
+
+        function addFolder() {
+            const folderName = document.getElementById('folderName').value.trim();
+            if (folderName && !appData.folders.includes(folderName)) {
+                appData.folders.push(folderName);
+                saveAppData();
+                document.getElementById('addFolderModal').style.display = 'none';
+                document.getElementById('folderName').value = '';
+                renderFolders();
             }
         }
 
-        /**
-         * Met à jour le dropdown des dossiers
-         */
-        function updateFoldersDropdown() {
-            elements.recordingFolder.innerHTML = '';
+        function renderFolders() {
+            const folderList = document.querySelector('.sidebar .nav-section:nth-child(2)');
+            folderList.innerHTML = '<h3>Dossiers</h3>';
+
             appData.folders.forEach(folder => {
-                const option = document.createElement('option');
-                option.value = folder.id;
-                option.textContent = folder.name;
-                elements.recordingFolder.appendChild(option);
+                if (folder !== 'Tous' && folder !== 'Favoris' && folder !== 'Récents') {
+                    const folderElement = document.createElement('div');
+                    folderElement.className = 'nav-item';
+                    folderElement.innerHTML = `
+                        <i class="fas fa-folder"></i>
+                        <span>${folder}</span>
+                    `;
+                    folderElement.onclick = () => setSection(folder);
+                    folderList.appendChild(folderElement);
+                }
             });
         }
 
-        /**
-         * Sauvegarde les enregistrements dans localStorage
-         */
-        function saveToLocalStorage() {
-            localStorage.setItem('plaudRecordings', JSON.stringify(appData.recordings));
+        // ===== STOCKAGE DES DONNÉES =====
+        function saveAppData() {
+            localStorage.setItem('plaudAppData', JSON.stringify(appData));
         }
 
-        /**
-         * Sauvegarde les dossiers dans localStorage
-         */
-        function saveFoldersToLocalStorage() {
-            localStorage.setItem('plaudFolders', JSON.stringify(appData.folders));
+        function loadAppData() {
+            const savedData = localStorage.getItem('plaudAppData');
+            if (savedData) {
+                appData = JSON.parse(savedData);
+            }
+            renderRecordings();
+            renderFolders();
         }
+
+        // ===== INITIALISATION =====
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAppData();
+
+            // Vérification initiale des permissions
+            if (isMobileDevice()) {
+                checkMicrophonePermission().catch(() => {
+                    document.getElementById('mobileInstructions').style.display = 'block';
+                });
+            }
+
+            // Gestion du modal
+            window.onclick = function(event) {
+                const modal = document.getElementById('addFolderModal');
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                }
+            };
+        });
     </script>
 </body>
 </html>
