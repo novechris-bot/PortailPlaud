@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Plaud - Application de notes vocales avec gestion de dossiers et recherche avancée">
+    <title>Plaud - Notes Vocales</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* ===== RESET & VARIABLES ===== */
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3a56d4;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --bg-light: #f5f7fa;
+            --card-light: #ffffff;
+            --text-light: #333;
+            --success: #4cc9f0;
+            --danger: #f8961e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-light);
+            color: var(--text-light);
+            min-height: 100vh;
+        }
+
+        /* ===== LAYOUT ===== */
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: var(--card-light);
+            border-right: 1px solid rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ===== COMPOSANTS ===== */
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 5px;
+            transition: all 0.2s;
+        }
+
+        .nav-item:hover {
+            background-color: rgba(67, 97, 238, 0.1);
+        }
+
+        .nav-item.active {
+            background-color: rgba(67, 97, 238, 0.2);
+            color: var(--primary);
+        }
+
+        .nav-item i {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .search-container {
+            flex: 1;
+            max-width: 400px;
+            position: relative;
+        }
+
+        .search-container input {
+            width: 100%;
+            padding: 10px 15px 10px 40px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .search-container i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6c757d;
+        }
+
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background-color: var(--light);
+            color: var(--text-light);
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background-color: #e9ecef;
+        }
+
+        .content {
+            flex: 1;
+            background-color: var(--card-light);
+            border-radius: 10px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            color: #6c757d;
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #ced4da;
+        }
+
+        .recordings-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .recording-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            transition: all 0.2s;
+        }
+
+        .recording-item:hover {
+            background-color: rgba(67, 97, 238, 0.05);
+        }
+
+        .recording-icon {
+            width: 40px;
+            height: 40px;
+            background-color: rgba(67, 97, 238, 0.1);
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            color: var(--primary);
+        }
+
+        .recording-player audio {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .recording-actions button {
+            background: none;
+            border: none;
+            color: #6c757d;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 3px;
+            transition: all 0.2s;
+        }
+
+        .recording-actions button:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        .recording-actions .favorite {
+            color: #ffc107;
+        }
+
+        .recording-actions .favorite.active {
+            color: #ffc107;
+        }
+
+        .recording-actions .delete {
+            color: #dc3545;
+        }
+
+        /* ===== MODALES & CONTRÔLES ===== */
+        .recording-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .recording-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 500px;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #6c757d;
+        }
+
+        .recording-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--primary);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 50px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            z-index: 100;
+            transition: all 0.3s;
+        }
+
+        .recording-controls.hidden {
+            opacity: 0;
+            visibility: hidden;
+            transform: translate(-50%, 100px);
+        }
+
+        .recording-timer {
+            font-size: 16px;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .recording-visualizer-container {
+            width: 200px;
+            height: 30px;
+            position: relative;
+        }
+
+        .visualizer-bars {
+            display: flex;
+            height: 100%;
+            align-items: flex-end;
+            gap: 2px;
+        }
+
+        .visualizer-bar {
+            flex: 1;
+            background-color: white;
+            border-radius: 2px;
+            transition: height 0.1s;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+                padding: 15px;
+            }
+
+            .recording-controls {
+                left: 20px;
+                transform: none;
+                width: calc(100% - 40px);
+                justify-content: space-between;
+                padding: 10px 20px;
+            }
+
+            .recording-visualizer-container {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="logo">Plaud</div>
+            <div class="nav-section">
+                <div class="nav-item active" data-section="recordings">
+                    <i class="fas fa-microphone"></i>
+                    <span>Enregistrements</span>
+                </div>
+                <div class="nav-item" data-section="folders">
+                    <i class="fas fa-folder"></i>
+                    <span>Dossiers</span>
+                </div>
+                <div class="nav-item" data-section="favorites">
+                    <i class="fas fa-star"></i>
+                    <span>Favoris</span>
+                </div>
+            </div>
+            <div class="nav-section">
+                <h3>Outils</h3>
+                <div class="nav-item" data-section="settings">
+                    <i class="fas fa-cog"></i>
+                    <span>Paramètres</span>
+                </div>
+                <div class="nav-item" data-section="help">
+                    <i class="fas fa-question-circle"></i>
+                    <span>Aide</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="header">
+                <div class="search-container">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Rechercher..." id="searchInput">
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" id="newFolderBtn">
+                        <i class="fas fa-folder-plus"></i>
+                        Nouveau dossier
+                    </button>
+                    <button class="btn btn-primary" id="recordBtn">
+                        <i class="fas fa-microphone"></i>
+                        Nouveau
+                    </button>
+                </div>
+            </div>
+
+            <div class="content">
+                <div class="empty-state" id="emptyState">
+                    <i class="fas fa-microphone-slash"></i>
+                    <h3>Aucun enregistrement</h3>
+                    <p>Cliquez sur "Nouveau" pour commencer</p>
+                </div>
+
+                <div class="recordings-list" id="recordingsList"></div>
+
+                <div class="recording-footer">
+                    <div class="recording-stats">
+                        <span id="recordingsCount">0 enregistrements</span>
+                    </div>
+                    <div class="recording-sort">
+                        <select id="sortSelect">
+                            <option value="date-desc">Date (récent d'abord)</option>
+                            <option value="date-asc">Date (ancien d'abord)</option>
+                            <option value="name-asc">Nom (A-Z)</option>
+                            <option value="name-desc">Nom (Z-A)</option>
+                            <option value="duration-asc">Durée (court d'abord)</option>
+                            <option value="duration-desc">Durée (long d'abord)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale d'enregistrement -->
+    <div class="recording-modal" id="recordingModal">
+        <div class="modal-content">
+            <button class="modal-close" id="modalClose">&times;</button>
+            <div class="modal-header">
+                <h2>Enregistrer l'audio</h2>
+            </div>
+            <div class="modal-body">
+                <div class="modal-form-group">
+                    <label for="recordingName">Nom</label>
+                    <input type="text" id="recordingName" placeholder="Ex: Réunion du 15 mai" required>
+                </div>
+                <div class="modal-form-group">
+                    <label for="recordingFolder">Dossier</label>
+                    <select id="recordingFolder"></select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelSave">Annuler</button>
+                <button class="btn btn-primary" id="saveRecording">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contrôles d'enregistrement -->
+    <div class="recording-controls hidden" id="recordingControls">
+        <div class="recording-timer" id="recordingTimer">00:00</div>
+        <div class="recording-visualizer-container">
+            <div class="recording-visualizer">
+                <div class="visualizer-bars" id="visualizerBars"></div>
+            </div>
+        </div>
+        <button id="stopRecording">
+            <i class="fas fa-stop"></i>
+        </button>
+    </div>
+
+    <script>
+        // ===== DONNÉES DE L'APPLICATION =====
+        const appData = {
+            recordings: JSON.parse(localStorage.getItem('plaudRecordings')) || [],
+            currentRecording: null,
+            mediaRecorder: null,
+            audioChunks: [],
+            audioContext: null,
+            analyser: null,
+            dataArray: null,
+            animationId: null,
+            isRecording: false,
+            startTime: null,
+            timerInterval: null,
+            folders: JSON.parse(localStorage.getItem('plaudFolders')) || [
+                { id: 'default', name: 'Aucun dossier' }
+            ]
+        };
+
+        // ===== ÉLÉMENTS DU DOM =====
+        const elements = {
+            recordingsList: document.getElementById('recordingsList'),
+            emptyState: document.getElementById('emptyState'),
+            recordingsCount: document.getElementById('recordingsCount'),
+            recordBtn: document.getElementById('recordBtn'),
+            recordingControls: document.getElementById('recordingControls'),
+            recordingTimer: document.getElementById('recordingTimer'),
+            stopRecording: document.getElementById('stopRecording'),
+            recordingModal: document.getElementById('recordingModal'),
+            recordingName: document.getElementById('recordingName'),
+            recordingFolder: document.getElementById('recordingFolder'),
+            saveRecording: document.getElementById('saveRecording'),
+            cancelSave: document.getElementById('cancelSave'),
+            modalClose: document.getElementById('modalClose'),
+            visualizerBars: document.getElementById('visualizerBars'),
+            searchInput: document.getElementById('searchInput'),
+            sortSelect: document.getElementById('sortSelect'),
+            newFolderBtn: document.getElementById('newFolderBtn')
+        };
+
+        // ===== INITIALISATION =====
+        document.addEventListener('DOMContentLoaded', () => {
+            renderRecordings();
+            setupEventListeners();
+            initializeVisualizer();
+            updateFoldersDropdown();
+            checkMicrophonePermission();
+        });
+
+        // ===== GESTION DES ÉVÉNEMENTS =====
+        function setupEventListeners() {
+            // Navigation
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+                    item.classList.add('active');
+                });
+            });
+
+            // Enregistrement
+            elements.recordBtn.addEventListener('click', startRecording);
+            elements.stopRecording.addEventListener('click', stopRecording);
+
+            // Modale
+            elements.saveRecording.addEventListener('click', saveRecording);
+            elements.cancelSave.addEventListener('click', hideRecordingModal);
+            elements.modalClose.addEventListener('click', hideRecordingModal);
+
+            // Recherche et tri
+            elements.searchInput.addEventListener('input', filterRecordings);
+            elements.sortSelect.addEventListener('change', renderRecordings);
+
+            // Dossiers
+            elements.newFolderBtn.addEventListener('click', createNewFolder);
+        }
+
+        // ===== FONCTIONS PRINCIPALES =====
+        /**
+         * Vérifie les permissions du microphone
+         */
+        async function checkMicrophonePermission() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(track => track.stop());
+            } catch (error) {
+                console.warn("Microphone non autorisé:", error);
+                alert("Veuillez autoriser l'accès au microphone dans les paramètres du navigateur.");
+            }
+        }
+
+        /**
+         * Démarre un enregistrement audio
+         */
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                appData.audioChunks = [];
+                appData.isRecording = true;
+                appData.startTime = new Date();
+
+                // Configuration du visualiseur audio
+                appData.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                appData.analyser = appData.audioContext.createAnalyser();
+                const source = appData.audioContext.createMediaStreamSource(stream);
+                source.connect(appData.analyser);
+                appData.analyser.fftSize = 64;
+                appData.dataArray = new Uint8Array(appData.analyser.frequencyBinCount);
+
+                // Configuration du MediaRecorder
+                appData.mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/wav' });
+                appData.mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        appData.audioChunks.push(event.data);
+                    }
+                };
+
+                appData.mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(appData.audioChunks, { type: 'audio/wav' });
+                    appData.currentRecording = {
+                        id: Date.now().toString(),
+                        name: '',
+                        blob: audioBlob,
+                        url: URL.createObjectURL(audioBlob),
+                        duration: getRecordingDuration(),
+                        date: new Date().toISOString(),
+                        folderId: 'default',
+                        isFavorite: false
+                    };
+
+                    showRecordingModal();
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                appData.mediaRecorder.start();
+                elements.recordBtn.disabled = true;
+                elements.recordingControls.classList.remove('hidden');
+                startTimer();
+                drawVisualizer();
+
+            } catch (error) {
+                console.error("Erreur microphone:", error);
+                alert("Impossible d'accéder au microphone. Veuillez vérifier les permissions.");
+            }
+        }
+
+        /**
+         * Arrête l'enregistrement en cours
+         */
+        function stopRecording() {
+            if (appData.mediaRecorder && appData.isRecording) {
+                appData.mediaRecorder.stop();
+                appData.isRecording = false;
+                elements.recordBtn.disabled = false;
+                elements.recordingControls.classList.add('hidden');
+                clearInterval(appData.timerInterval);
+                cancelAnimationFrame(appData.animationId);
+            }
+        }
+
+        /**
+         * Affiche la modale d'enregistrement
+         */
+        function showRecordingModal() {
+            elements.recordingName.value = `Enregistrement ${new Date().toLocaleString()}`;
+            elements.recordingModal.classList.add('active');
+            elements.recordingName.focus();
+        }
+
+        /**
+         * Masque la modale d'enregistrement
+         */
+        function hideRecordingModal() {
+            elements.recordingModal.classList.remove('active');
+            if (appData.currentRecording) {
+                URL.revokeObjectURL(appData.currentRecording.url);
+                appData.currentRecording = null;
+            }
+        }
+
+        /**
+         * Sauvegarde l'enregistrement dans localStorage
+         */
+        function saveRecording() {
+            const name = elements.recordingName.value.trim();
+            const folderId = elements.recordingFolder.value;
+
+            if (!name) {
+                alert("Veuillez donner un nom à l'enregistrement");
+                return;
+            }
+
+            appData.currentRecording.name = name;
+            appData.currentRecording.folderId = folderId;
+            appData.recordings.push(appData.currentRecording);
+            saveToLocalStorage();
+            renderRecordings();
+            hideRecordingModal();
+        }
+
+        /**
+         * Démarre le minuteur d'enregistrement
+         */
+        function startTimer() {
+            appData.timerInterval = setInterval(() => {
+                elements.recordingTimer.textContent = formatTime(getRecordingDuration());
+            }, 1000);
+        }
+
+        /**
+         * Calcule la durée de l'enregistrement
+         */
+        function getRecordingDuration() {
+            return Math.floor((new Date() - appData.startTime) / 1000);
+        }
+
+        /**
+         * Formate le temps en MM:SS
+         */
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const secs = (seconds % 60).toString().padStart(2, '0');
+            return `${mins}:${secs}`;
+        }
+
+        /**
+         * Dessine le visualiseur audio
+         */
+        function drawVisualizer() {
+            if (!appData.analyser) return;
+
+            appData.analyser.getByteFrequencyData(appData.dataArray);
+            const bars = elements.visualizerBars.querySelectorAll('.visualizer-bar');
+            const barCount = bars.length;
+            const step = Math.floor(appData.dataArray.length / barCount);
+
+            bars.forEach((bar, i) => {
+                const value = appData.dataArray[i * step];
+                bar.style.height = `${value / 2.5}%`;
+            });
+
+            appData.animationId = requestAnimationFrame(drawVisualizer);
+        }
+
+        /**
+         * Initialise le visualiseur audio
+         */
+        function initializeVisualizer() {
+            for (let i = 0; i < 20; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'visualizer-bar';
+                elements.visualizerBars.appendChild(bar);
+            }
+        }
+
+        /**
+         * Rend la liste des enregistrements
+         */
+        function renderRecordings() {
+            if (appData.recordings.length === 0) {
+                elements.emptyState.style.display = 'flex';
+                elements.recordingsList.innerHTML = '';
+                elements.recordingsCount.textContent = '0 enregistrements';
+                return;
+            }
+
+            elements.emptyState.style.display = 'none';
+            elements.recordingsList.innerHTML = '';
+
+            // Filtrer et trier
+            let filteredRecordings = filterRecordings();
+            filteredRecordings = sortRecordings(filteredRecordings);
+
+            filteredRecordings.forEach(recording => {
+                const recordingElement = document.createElement('div');
+                recordingElement.className = 'recording-item';
+                recordingElement.dataset.id = recording.id;
+
+                const folder = appData.folders.find(f => f.id === recording.folderId) || appData.folders[0];
+                const duration = formatTime(recording.duration);
+
+                recordingElement.innerHTML = `
+                    <div class="recording-icon">
+                        <i class="fas fa-microphone"></i>
+                    </div>
+                    <div class="recording-info">
+                        <div class="recording-name">${recording.name}</div>
+                        <div class="recording-meta">
+                            ${new Date(recording.date).toLocaleString()} • ${duration} • ${folder.name}
+                        </div>
+                        <audio controls src="${recording.url}"></audio>
+                    </div>
+                    <div class="recording-actions">
+                        <button class="favorite ${recording.isFavorite ? 'active' : ''}" title="Favoris">
+                            <i class="fas fa-star"></i>
+                        </button>
+                        <button class="delete" title="Supprimer">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+
+                elements.recordingsList.appendChild(recordingElement);
+
+                // Événements
+                recordingElement.querySelector('.favorite').addEventListener('click', () => {
+                    toggleFavorite(recording.id);
+                });
+
+                recordingElement.querySelector('.delete').addEventListener('click', () => {
+                    deleteRecording(recording.id);
+                });
+            });
+
+            elements.recordingsCount.textContent = `${filteredRecordings.length} enregistrement${filteredRecordings.length !== 1 ? 's' : ''}`;
+        }
+
+        /**
+         * Filtre les enregistrements par recherche
+         */
+        function filterRecordings() {
+            const searchTerm = elements.searchInput.value.toLowerCase();
+            return appData.recordings.filter(recording =>
+                recording.name.toLowerCase().includes(searchTerm) ||
+                new Date(recording.date).toLocaleString().toLowerCase().includes(searchTerm)
+            );
+        }
+
+        /**
+         * Trie les enregistrements
+         */
+        function sortRecordings(recordings = null) {
+            const sortValue = elements.sortSelect.value;
+            const list = recordings || appData.recordings;
+
+            return [...list].sort((a, b) => {
+                switch (sortValue) {
+                    case 'date-desc': return new Date(b.date) - new Date(a.date);
+                    case 'date-asc': return new Date(a.date) - new Date(b.date);
+                    case 'name-asc': return a.name.localeCompare(b.name);
+                    case 'name-desc': return b.name.localeCompare(a.name);
+                    case 'duration-asc': return a.duration - b.duration;
+                    case 'duration-desc': return b.duration - a.duration;
+                    default: return 0;
+                }
+            });
+        }
+
+        /**
+         * Bascule l'état favori d'un enregistrement
+         */
+        function toggleFavorite(id) {
+            const recording = appData.recordings.find(r => r.id === id);
+            if (recording) {
+                recording.isFavorite = !recording.isFavorite;
+                saveToLocalStorage();
+                renderRecordings();
+            }
+        }
+
+        /**
+         * Supprime un enregistrement
+         */
+        function deleteRecording(id) {
+            if (confirm("Supprimer cet enregistrement ?")) {
+                const recording = appData.recordings.find(r => r.id === id);
+                if (recording) {
+                    URL.revokeObjectURL(recording.url);
+                }
+                appData.recordings = appData.recordings.filter(r => r.id !== id);
+                saveToLocalStorage();
+                renderRecordings();
+            }
+        }
+
+        /**
+         * Crée un nouveau dossier
+         */
+        function createNewFolder() {
+            const folderName = prompt("Nom du dossier:");
+            if (folderName && folderName.trim()) {
+                const newFolder = {
+                    id: Date.now().toString(),
+                    name: folderName.trim()
+                };
+                appData.folders.push(newFolder);
+                saveFoldersToLocalStorage();
+                updateFoldersDropdown();
+            }
+        }
+
+        /**
+         * Met à jour le dropdown des dossiers
+         */
+        function updateFoldersDropdown() {
+            elements.recordingFolder.innerHTML = '';
+            appData.folders.forEach(folder => {
+                const option = document.createElement('option');
+                option.value = folder.id;
+                option.textContent = folder.name;
+                elements.recordingFolder.appendChild(option);
+            });
+        }
+
+        /**
+         * Sauvegarde les enregistrements dans localStorage
+         */
+        function saveToLocalStorage() {
+            localStorage.setItem('plaudRecordings', JSON.stringify(appData.recordings));
+        }
+
+        /**
+         * Sauvegarde les dossiers dans localStorage
+         */
+        function saveFoldersToLocalStorage() {
+            localStorage.setItem('plaudFolders', JSON.stringify(appData.folders));
+        }
+    </script>
+</body>
+</html>
